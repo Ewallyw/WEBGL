@@ -1,0 +1,64 @@
+<!-- horse-webgl/index.html -->
+<!DOCTYPE html>  <!-- 定义文档类型为HTML5 -->
+<html lang="zh-CN">  <!-- 设置文档语言为中文 -->
+<head>
+    <meta charset="utf-8">
+    <title>WebGL Horse</title>
+    <style>
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            background: white; 
+        }
+        #glCanvas { 
+            display: block; 
+        }
+        #menu {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(255,255,255,0.9);
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        .menu-item {
+            cursor: pointer;
+            padding: 8px 15px;
+            margin: 5px 0;
+            background: #f0f0f0;
+            border-radius: 3px;
+            transition: background 0.3s;
+        }
+        .menu-item:hover {
+            background: #e0e0e0;
+        }
+        .menu-item.active {
+            background: #4CAF50;
+            color: white;
+        }
+        #status {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(255,255,255,0.9);
+            padding: 5px 10px;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="glCanvas"></canvas>
+    <div id="menu">
+        <!-- ... existing menu items ... -->
+    </div>
+    <div id="status">当前控制: 整体</div>
+
+    <!-- 按顺序加载JS文件 -->
+    <script src="js/shaders.js"></script>
+    <script src="js/horseData.js"></script>
+    <script src="js/webgl-core.js"></script>
+    <script src="js/controls.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>

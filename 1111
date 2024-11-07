@@ -1,0 +1,169 @@
+// 主程序入口
+function main() {
+    // 获取canvas元素
+    const canvas = document.querySelector('#webgl');
+    const gl = canvas.getContext('webgl');
+
+    if (!gl) {
+        console.log('Failed to get the rendering context for WebGL');
+        return;
+    }
+
+    // 初始化着色器
+    const program = initShaders(gl, VSHADER_SOURCE, FSHADER_SOURCE);
+    if (!program) {
+        console.log('Failed to initialize shaders.');
+        return;
+    }
+
+    // 初始化模型加载器
+    const loader = new OBJLoader();
+    
+    // 初始化变换矩阵
+    const modelMatrix = new Matrix4();
+    const viewMatrix = new Matrix4();
+    const projMatrix = new Matrix4();
+    
+    // 视图矩阵设置
+    viewMatrix.setLookAt(0, 0, 5, 0, 0, 0, 0, 1, 0);
+    
+    // 投影矩阵设置
+    projMatrix.setPerspective(30, canvas.width/canvas.height, 1, 100);
+
+    // 获取shader变量位置
+    const a_Position = gl.getAttribLocation(program, 'a_Position');
+    const u_ModelMatrix = gl.getUniformLocation(program, 'u_ModelMatrix');
+    const u_ViewMatrix = gl.getUniformLocation(program, 'u_ViewMatrix');
+    const u_ProjMatrix = gl.getUniformLocation(program, 'u_ProjMatrix');
+
+    // 设置清除色和深度测试
+    gl.clearColor(0.0, 0.0, 0.0, 1.0);
+    gl.enable(gl.DEPTH_TEST);// 创建缓冲区
+    const vertexBuffer = gl.createBuffer();
+    if (!vertexBuffer) {
+        console.log('Failed to create the buffer object');
+        return -1;
+    }
+
+    // 加载OBJ模型数据
+    async function loadModel(objFile) {
+        try {
+            const modelData = await loader.loadOBJ(objFile);
+            const vertexArray = loader.getVertexArray();
+            
+            // 绑定缓冲区并传入数据
+            gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertexArray), gl.STATIC_DRAW);
+            
+            // 获取模型中心点和边界框
+            const center = loader.getCenter();
+            const boundingBox = loader.getBoundingBox();
+            
+            // 计算模型缩放比例
+            const scale = calculateModelScale(boundingBox);
+            modelMatrix.setTranslate(center.x, center.y, center.z);
+            modelMatrix.scale(scale, scale, scale);
+            
+            return vertexArray.length / 3; // 返回顶点数量
+        } catch (error) {
+            console.error('Error loading model:', error);
+            return 0;
+        }
+    }
+
+    // 计算模型合适的缩放比例
+    function calculateModelScale(boundingBox) {
+        const sizeX = boundingBox.max.x - boundingBox.min.x;
+        const sizeY = boundingBox.max.y - boundingBox.min.y;
+        const sizeZ = boundingBox.max.z - boundingBox.min.z;
+        const maxSize = Math.max(sizeX, sizeY, sizeZ);
+        return 2.0 / maxSize; // 将模型缩放到合适的大小
+    }// 处理键盘输入
+    document.onkeydown = function(ev) {
+        switch(ev.key) {
+            case 'w': // 前进
+                modelMatrix.translate(0.0, 0.0, -0.1);
+                break;
+            case 's': // 后退
+                modelMatrix.translate(0.0, 0.0, 0.1);
+                break;
+            case 'a': // 左转
+                modelMatrix.rotate(5, 0, 1, 0);
+                break;
+            case 'd': // 右转
+                modelMatrix.rotate(-5, 0, 1, 0);
+                break;
+            case 'q': // 左横滚
+                modelMatrix.rotate(5, 0, 0, 1);
+                break;
+            case 'e': // 右横滚
+                modelMatrix.rotate(-5, 0, 0, 1);
+                break;
+            case 'r': // 上俯仰
+                modelMatrix.rotate(5, 1, 0, 0);
+                break;
+            case 'f': // 下俯仰
+                modelMatrix.rotate(-5, 1, 0, 0);
+                break;
+        }
+        
+        // 重绘场景
+        draw(gl, vertexCount, a_Position, u_ModelMatrix, u_ViewMatrix, u_ProjMatrix,
+             modelMatrix, viewMatrix, projMatrix);
+    }
+
+    // 处理鼠标控制
+    let lastX = -1, lastY = -1;
+    let dragging = false;
+    
+    canvas.onmousedown = function(ev) {
+        const x = ev.clientX, y = ev.clientY;
+        dragging = true;
+        lastX = x;
+        lastY = y;
+    };canvas.onmousemove = function(ev) {
+        const x = ev.clientX, y = ev.clientY;
+        if (dragging) {
+            const factor = 100/canvas.height;
+            const dx = factor * (x - lastX);
+            const dy = factor * (y - lastY);
+            
+            modelMatrix.rotate(dx, 0, 1, 0);
+            modelMatrix.rotate(dy, 1, 0, 0);
+            
+            draw(gl, vertexCount, a_Position, u_ModelMatrix, u_ViewMatrix, u_ProjMatrix,
+                 modelMatrix, viewMatrix, projMatrix);
+        }
+        lastX = x;
+        lastY = y;
+    };
+
+    canvas.onmouseup = function(ev) { dragging = false; };
+
+    // 绘制函数
+    function draw(gl, vertexCount, a_Position, u_ModelMatrix, u_ViewMatrix, u_ProjMatrix,
+                 modelMatrix, viewMatrix, projMatrix) {
+        // 清除颜色和深度缓冲
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+        // 设置顶点属性
+        gl.vertexAttribPointer(a_Position, 3, gl.FLOAT, false, 0, 0);
+        gl.enableVertexAttribArray(a_Position);
+
+        // 传递矩阵到着色器
+        gl.uniformMatrix4fv(u_ModelMatrix, false, modelMatrix.elements);
+        gl.uniformMatrix4fv(u_ViewMatrix, false, viewMatrix.elements);
+        gl.uniformMatrix4fv(u_ProjMatrix, false, projMatrix.elements);
+
+        // 绘制模型
+        gl.drawArrays(gl.TRIANGLES, 0, vertexCount);
+    }
+
+    // 加载模型并开始渲染
+    let vertexCount = 0;
+    loadModel(objFile).then(count => {
+        vertexCount = count;
+        draw(gl, vertexCount, a_Position, u_ModelMatrix, u_ViewMatrix, u_ProjMatrix,
+             modelMatrix, viewMatrix, projMatrix);
+    });
+}

@@ -1,0 +1,460 @@
+<!DOCTYPE html>  <!-- 定义文档类型为HTML5 -->
+<html lang="zh-CN">  <!-- 设置文档语言为中文 -->
+<head>  <!-- 文档头部 -->
+  <meta charset="UTF-8">  <!-- 设置字符编码为UTF-8 -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">  <!-- 设置视口，适配移动设备 -->
+  <title>WebGL 马</title>  <!-- 文档标题 -->
+  <style> 
+    body {  
+      display: flex; 
+      flex-direction: column;  
+      align-items: center;  
+    }
+    #webgl-canvas {  
+      border: 1px solid black; 
+    }
+  </style>
+</head>
+<body>  <!-- 文档主体 -->
+  <canvas id="webgl-canvas" width="500" height="500"></canvas>  <!-- 定义一个500x500像素的画布 -->
+  <div id="menu">  <!-- 定义一个菜单容器 -->
+    <button onclick="selectPart('body')">选择身体</button>  <!-- 按钮，点击时选择身体部分 -->
+    <button onclick="selectPart('head')">选择头部</button>  <!-- 按钮，点击时选择头部部分 -->
+    <button onclick="selectPart('frontLeg')">选择左前腿</button>  <!-- 按钮，点击时选择左前腿部分 -->
+    <button onclick="selectPart('backLeg')">选择右后腿</button>  <!-- 按钮，点击时选择右后腿部分 -->
+    <button onclick="moveSelected('up')">上移</button>  <!-- 按钮，点击时上移选中的部分 -->
+    <button onclick="moveSelected('down')">下移</button>  <!-- 按钮，点击时下移选中的部分 -->
+    <button onclick="moveSelected('left')">左移</button>  <!-- 按钮，点击时左移选中的部分 -->
+    <button onclick="moveSelected('right')">右移</button>  <!-- 按钮，点击时右移选中的部分 -->
+  </div>
+  <script>  <!-- 内联脚本 -->
+    // 创建 WebGL 程序，用于绘制并控制二维马动画（像素风格）
+
+    // 获取画布和初始化 WebGL 上下文
+    const canvas = document.getElementById('webgl-canvas');  // 获取画布元素
+    const gl = canvas.getContext('webgl');  // 获取WebGL上下文
+    if (!gl) {  // 如果无法获取WebGL上下文
+      console.error('无法初始化 WebGL，上下文可能不被支持。');  // 输出错误信息
+    }
+
+    // 设置窗口背景颜色为白色
+    gl.clearColor(1.0, 1.0, 1.0, 1.0);  // 设置清除颜色为白色
+    gl.clear(gl.COLOR_BUFFER_BIT);  // 清除颜色缓冲区
+
+    // 定义像素风格马的顶点
+    const vertices = new Float32Array([  // 创建顶点数组
+      // 身体部分（像素风格矩形）
+      -0.3, -0.5,0.5,  // 左下角
+       0.3, -0.5,0.5,  // 右下角
+       0.3,  0.0,0.5,  // 右上角
+      -0.3,  0.0,0.5,  // 左上角
+
+      -0.3, -0.5,-0.5,  // 左下角
+       0.3, -0.5,-0.5,  // 右下角
+       0.3,  0.0,-0.5,  // 右上角
+      -0.3,  0.0,-0.5,  // 左上角
+      
+       0.3,  0.0,-0.5,  // 右上角
+       0.3, -0.5,-0.5,  // 右下角
+       0.3,  0.0,0.5,  // 右上角
+       0.3, -0.5,0.5,  // 右下角
+
+      -0.3, -0.5,-0.5,  // 左下角
+      -0.3, -0.5,-0.5,  // 右下角
+      -0.3,  0.0,-0.5,  // 右上角
+      -0.3,  0.0,-0.5,  // 左上角
+      
+      // 头部部分
+      0.1,  0.0, 0.5, // 头部连接点
+      0.4,  0.0, 0.5,// 头部右下角
+      0.4,  0.3, 0.5, // 头部右上角
+      0.1,  0.3, 0.5, // 头部左上角
+
+      0.1,  0.0, -0.5, // 头部连接点
+      0.4,  0.0, -0.5,// 头部右下角
+      0.4,  0.3, -0.5, // 头部右上角
+      0.1,  0.3, -0.5, // 头部左上角
+
+      0.4,  0.0, -0.5,// 头部右下角
+      0.4,  0.3, -0.5, // 头部右上角
+      0.4,  0.0, 0.5,// 头部右下角
+      0.4,  0.3, 0.5, // 头部右上角
+
+      0.1,  0.0, -0.5, // 头部连接点
+      0.1,  0.3, -0.5, // 头部左上角
+      0.1,  0.0, 0.5, // 头部连接点
+      0.1,  0.3, 0.5, // 头部左上角
+      
+
+      // 前腿部分
+      -0.25, -0.5,-0.5,  // 左前腿上部
+      -0.25, -0.9,-0.5,  // 左前腿左侧
+      -0.15, -0.5,-0.5,  // 左前腿右侧
+      -0.15, -0.9,-0.5,  // 左前腿下部
+      
+      -0.25, -0.5,-0.2, // 左前腿上部
+      -0.25, -0.9,-0.2,  // 左前腿左侧
+      -0.15, -0.5,-0.2,  // 左前腿右侧
+      -0.15, -0.9,-0.2,  // 左前腿下部      
+      
+      -0.25, -0.5,-0.5,  // 左前腿上部
+      -0.25, -0.9,-0.5,  // 左前腿左侧
+      -0.25, -0.5,-0.2,  // 左前腿上部
+      -0.25, -0.9,-0.2,  // 左前腿左侧   
+      
+      -0.15, -0.5,-0.2,  // 左前腿右侧
+      -0.15, -0.9,-0.2,  // 左前腿下部
+      -0.15, -0.5,-0.5,  // 左前腿右侧
+      -0.15, -0.9,-0.5, // 左前腿下部
+
+      // 前腿部分
+      -0.25, -0.5,0.5,  // 左前腿上部
+      -0.25, -0.9,0.5,  // 左前腿左侧
+      -0.15, -0.5,0.5,  // 左前腿右侧
+      -0.15, -0.9,0.5,  // 左前腿下部
+      
+      -0.25, -0.5,0.2, // 左前腿上部
+      -0.25, -0.9,0.2,  // 左前腿左侧
+      -0.15, -0.5,0.2,  // 左前腿右侧
+      -0.15, -0.9,0.2,  // 左前腿下部      
+      
+      -0.25, -0.5,0.5,  // 左前腿上部
+      -0.25, -0.9,0.5,  // 左前腿左侧
+      -0.25, -0.5,0.2,  // 左前腿上部
+      -0.25, -0.9,0.2,  // 左前腿左侧   
+      
+      -0.15, -0.5,0.2,  // 左前腿右侧
+      -0.15, -0.9,0.2,  // 左前腿下部
+      -0.15, -0.5,0.5,  // 左前腿右侧
+      -0.15, -0.9,0.5, // 左前腿下部
+      
+      // 后腿部分
+       0.15, -0.5,-0.5,  // 右后腿上部
+       0.15, -0.9,-0.5,  // 右后腿左侧
+       0.25, -0.5,-0.5,  // 右后腿右侧
+       0.25, -0.9,-0.5,  // 右后腿下部
+
+       0.15, -0.5,-0.2,  // 右后腿上部
+       0.15, -0.9,-0.2,  // 右后腿左侧
+       0.25, -0.5,-0.2,  // 右后腿右侧
+       0.25, -0.9,-0.2,  // 右后腿下部
+
+       0.15, -0.5,-0.2,  // 右后腿上部
+       0.15, -0.9,-0.2,  // 右后腿左侧
+       0.15, -0.5,-0.5,  // 右后腿上部
+       0.15, -0.9,-0.5,  // 右后腿左侧
+
+       0.25, -0.5,-0.2,  // 右后腿右侧
+       0.25, -0.9,-0.2,  // 右后腿下部
+       0.25, -0.5,-0.5,  // 右后腿右侧
+       0.25, -0.9,-0.5,  // 右后腿下部
+
+      // 后腿部分
+       0.15, -0.5,0.5,  // 右后腿上部
+       0.15, -0.9,0.5,  // 右后腿左侧
+       0.25, -0.5,0.5,  // 右后腿右侧
+       0.25, -0.9,0.5,  // 右后腿下部
+
+       0.15, -0.5,0.2,  // 右后腿上部
+       0.15, -0.9,0.2,  // 右后腿左侧
+       0.25, -0.5,0.2,  // 右后腿右侧
+       0.25, -0.9,0.2,  // 右后腿下部
+
+       0.15, -0.5,0.2,  // 右后腿上部
+       0.15, -0.9,0.2,  // 右后腿左侧
+       0.15, -0.5,0.5,  // 右后腿上部
+       0.15, -0.9,0.5,  // 右后腿左侧
+
+       0.25, -0.5,0.2,  // 右后腿右侧
+       0.25, -0.9,0.2,  // 右后腿下部
+       0.25, -0.5,0.5,  // 右后腿右侧
+       0.25, -0.9,0.5,  // 右后腿下部
+      // 尾巴部分
+      -0.3,  0.0,0.3,  // 尾巴根部
+      -0.4,  0.1,0.3,  // 尾巴中段
+      -0.35, 0.2,0.3,  // 尾巴末端
+
+      -0.3,  0.0,-0.3,  // 尾巴根部
+      -0.35, 0.2,-0.3,  // 尾巴末端  
+      -0.4,  0.1,-0.3,  // 尾巴中段
+    
+
+      -0.3,  0.0,0.3,  // 尾巴根部
+      -0.35, 0.2,0.3,  // 尾巴末端
+      -0.3,  0.0,-0.3,  // 尾巴根部
+      -0.35, 0.2,-0.3,  // 尾巴末端          
+
+      -0.4,  0.1,0.3,  // 尾巴中段
+      -0.35, 0.2,0.3,  // 尾巴末端      
+      -0.4,  0.1,-0.3,  // 尾巴中段
+      -0.35, 0.2,-0.3,  // 尾巴末端
+
+      -0.3,  0.0,0.3,  // 尾巴根部
+      -0.4,  0.1,0.3,  // 尾巴中段
+      -0.3,  0.1,-0.3,  // 尾巴中段
+      -0.4,  0.1,-0.3,  // 尾巴中段
+
+    ]);
+
+    // 创建缓冲区并将顶点数据绑定到缓冲区
+    const vertexBuffer = gl.createBuffer();  // 创建顶点缓冲区
+    gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);  // 绑定顶点缓冲区
+    gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);  // 将顶点数据传输到缓冲区
+
+    // 创建着色器程序
+    const vertexShaderSource = `  // 顶点着色器源码
+      attribute vec2 a_Position;  // 顶点位置属性
+      uniform vec2 u_Translation;  // 平移向量
+      void main() {
+        gl_Position = vec4(a_Position + u_Translation, 0.0, 1.0);  // 设置顶点位置
+      }
+    `;
+
+    const fragmentShaderSource = `  // 片段着色器源码
+      precision mediump float;  // 设置浮点精度
+      uniform vec4 u_FragColor;  // 设置片段颜色
+      void main() {
+        gl_FragColor = u_FragColor;  // 使用传递的片段颜色
+      }
+    `;
+
+    function createShader(gl, type, source) {  // 创建着色器函数
+      const shader = gl.createShader(type);  // 创建着色器
+      gl.shaderSource(shader, source);  // 设置着色器源码
+      gl.compileShader(shader);  // 编译着色器
+      if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {  // 如果编译失败
+        console.error('着色器编译失败：', gl.getShaderInfoLog(shader));  // 输出错误信息
+        gl.deleteShader(shader);  // 删除着色器
+        return null;  // 返回null
+      }
+      return shader;  // 返回着色器
+    }
+
+    const vertexShader = createShader(gl, gl.VERTEX_SHADER, vertexShaderSource);  // 创建顶点着色器
+    const fragmentShader = createShader(gl, gl.FRAGMENT_SHADER, fragmentShaderSource);  // 创建片段着色器
+
+    // 链接着色器程序
+    const program = gl.createProgram();  // 创建着色器程序
+    gl.attachShader(program, vertexShader);  // 附加顶点着色器
+    gl.attachShader(program, fragmentShader);  // 附加片段着色器
+    gl.linkProgram(program);  // 链接着色器程序
+
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {  // 如果链接失败
+      console.error('程序链接失败：', gl.getProgramInfoLog(program));  // 输出错误信息
+      gl.deleteProgram(program);  // 删除着色器程序
+    }
+
+    gl.useProgram(program);  // 使用着色器程序
+
+    // 绑定顶点数据到着色器中的属性
+    const a_Position = gl.getAttribLocation(program, 'a_Position');  // 获取顶点位置属性位置
+    const u_Translation = gl.getUniformLocation(program, 'u_Translation');  // 获取平移向量位置
+    const u_FragColor = gl.getUniformLocation(program, 'u_FragColor');  // 获取片段颜色位置
+    gl.enableVertexAttribArray(a_Position);  // 启用顶点位置属性（从缓冲区读取）
+    gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);  // 绑定顶点缓冲区
+    gl.vertexAttribPointer(a_Position, 2, gl.FLOAT, false, 0, 0);   // 设置顶点属性指针
+
+    let selectedPart = 'body';  // 初始化选中的部分为身体
+    const translations = {  // 初始化各部分的平移向量
+      body: { x: 0, y: 0 },
+      head: { x: 0, y: 0 },
+      frontLeg: { x: 0, y: 0 },
+      backLeg: { x: 0, y: 0 },
+      tail: { x: 0, y: 0 }
+    };
+    let isDragging = false;
+    let dragOffset = { x: 0, y: 0 };
+
+    function drawScene() {  // 绘制场景函数
+      gl.clear(gl.COLOR_BUFFER_BIT);  // 清除颜色缓冲区（为最新的颜色而不是叠加产生）
+
+      // 绘制身体部分
+      gl.uniform2f(u_Translation, translations.body.x, translations.body.y);  // 设置身体部分的平移
+      gl.uniform4f(u_FragColor, 0.6, 0.3, 0.0, 1.0);  // 设置身体颜色为棕色
+      gl.drawArrays(gl.TRIANGLE_FAN, 0, 4);  // 绘制身体
+
+      // 绘制头部部分
+      gl.uniform2f(u_Translation, translations.head.x + translations.body.x, translations.head.y + translations.body.y);  // 设置头部部分的平移
+      gl.uniform4f(u_FragColor, 0.6, 0.3, 0.0, 1.0);  // 设置头部颜色为棕色
+      gl.drawArrays(gl.TRIANGLE_FAN, 4, 4);  // 绘制头部
+
+      // 绘制左前腿部分
+      gl.uniform2f(u_Translation, translations.frontLeg.x + translations.body.x, translations.frontLeg.y + translations.body.y);  // 设置左前腿部分的平移
+      gl.uniform4f(u_FragColor, 0.6, 0.3, 0.0, 1.0);  // 设置左前腿颜色为棕色
+      gl.drawArrays(gl.TRIANGLE_FAN, 8, 4);  // 绘制左前腿
+
+      // 绘制右后腿部分
+      gl.uniform2f(u_Translation, translations.backLeg.x + translations.body.x, translations.backLeg.y + translations.body.y);  // 设置右后腿部分的平移
+      gl.uniform4f(u_FragColor, 0.6, 0.3, 0.0, 1.0);  // 设置右后腿颜色为棕色
+      gl.drawArrays(gl.TRIANGLE_FAN, 12, 4);  // 绘制右后腿
+
+      // 绘制尾巴部分
+      gl.uniform2f(u_Translation, translations.tail.x + translations.body.x, translations.tail.y + translations.body.y);  // 设置尾巴部分的平移
+      gl.uniform4f(u_FragColor, 0.0, 0.0, 0.0, 1.0);  // 设置尾巴颜色为黑色
+      gl.drawArrays(gl.TRIANGLES, 16, 3);  // 绘制尾巴
+    }
+
+    drawScene();  // 调用绘制场景函数
+
+    function selectPart(part) {  // 选择部分函数
+      selectedPart = part;  // 设置选中的部分
+      console.log('选择了部分：', part);  // 输出选中的部分
+    }
+
+    function moveSelected(direction) {  // 移动选中部分函数
+      const moveAmount = 0.05;  // 移动量
+      if (selectedPart === 'body') {
+        switch (direction) {  // 根据方向移动
+          case 'up':
+            translations.body.y += moveAmount;  // 上移
+            break;
+          case 'down':
+            translations.body.y -= moveAmount;  // 下移
+            break;
+          case 'left':
+            translations.body.x -= moveAmount;  // 左移
+            break;
+          case 'right':
+            translations.body.x += moveAmount;  // 右���
+            break;
+        }
+      } else {
+        switch (direction) {  // 根据方向移动
+          case 'up':
+            translations[selectedPart].y += moveAmount;  // 上移
+            break;
+          case 'down':
+            translations[selectedPart].y -= moveAmount;  // 下移
+            break;
+          case 'left':
+            translations[selectedPart].x -= moveAmount;  // 左移
+            break;
+          case 'right':
+            translations[selectedPart].x += moveAmount;  // 右移
+            break;
+        }
+      }
+      drawScene();  // 重新绘制场景
+    }
+
+    function isMouseOverPart(mouseX, mouseY, part) {  // 判断鼠标是否在指定部分上
+      const bounds = {
+        body: { left: -0.3, right: 0.3, top: 0.0, bottom: -0.5 },
+        head: { left: 0.1, right: 0.4, top: 0.3, bottom: 0.0 },
+        frontLeg: { left: -0.25, right: -0.15, top: -0.5, bottom: -0.9 },
+        backLeg: { left: 0.15, right: 0.25, top: -0.5, bottom: -0.9 },
+      };
+
+      if (part === 'tail') {
+        // 使用重心法判断鼠标是否在三角形内
+        const tailVertices = [
+          { x: -0.3 + translations.body.x, y: 0.0 + translations.body.y },
+          { x: -0.4 + translations.body.x, y: 0.1 + translations.body.y },
+          { x: -0.35 + translations.body.x, y: 0.2 + translations.body.y }
+        ];
+
+        const area = (tailVertices[0].x * (tailVertices[1].y - tailVertices[2].y) +
+                      tailVertices[1].x * (tailVertices[2].y - tailVertices[0].y) +
+                      tailVertices[2].x * (tailVertices[0].y - tailVertices[1].y)) / 2;
+
+        const area1 = (mouseX * (tailVertices[1].y - tailVertices[2].y) +
+                       tailVertices[1].x * (tailVertices[2].y - mouseY) +
+                       tailVertices[2].x * (mouseY - tailVertices[1].y)) / 2;
+
+        const area2 = (tailVertices[0].x * (mouseY - tailVertices[2].y) +
+                       mouseX * (tailVertices[2].y - tailVertices[0].y) +
+                       tailVertices[2].x * (tailVertices[0].y - mouseY)) / 2;
+
+        const area3 = (tailVertices[0].x * (tailVertices[1].y - mouseY) +
+                       tailVertices[1].x * (mouseY - tailVertices[0].y) +
+                       mouseX * (tailVertices[0].y - tailVertices[1].y)) / 2;
+
+        return Math.abs(area - (area1 + area2 + area3)) < 0.0001;
+      }
+      const partBounds = bounds[part];
+      return (
+        mouseX >= partBounds.left + translations.body.x &&
+        mouseX <= partBounds.right + translations.body.x &&
+        mouseY >= partBounds.bottom + translations.body.y &&
+        mouseY <= partBounds.top + translations.body.y
+      );
+    }
+
+    canvas.addEventListener('mousedown', (event) => {  // 检测鼠标按下事件
+      const rect = canvas.getBoundingClientRect();
+      const mouseX = (event.clientX - rect.left) / canvas.width * 2 - 1;
+      const mouseY = (event.clientY - rect.top) / canvas.height * -2 + 1;
+
+      for (const part of Object.keys(translations)) {
+        if (isMouseOverPart(mouseX, mouseY, part)) {
+          selectPart(part);
+          isDragging = true;
+          dragOffset = { x: event.clientX, y: event.clientY };
+          break;
+        }
+      }
+    });
+
+    canvas.addEventListener('mousemove', (event) => {  // 检测鼠标移动事件
+      if (isDragging) {
+        const dx = (event.clientX - dragOffset.x) / canvas.width * 2;
+        const dy = (event.clientY - dragOffset.y) / canvas.height * -2;
+        translations[selectedPart].x += dx;
+        translations[selectedPart].y += dy;
+        dragOffset = { x: event.clientX, y: event.clientY };
+        drawScene();
+      }
+    });
+
+    canvas.addEventListener('mouseup', () => {  // 检测鼠标松开事件
+      isDragging = false;
+    });
+
+    document.addEventListener('keydown', (event) => {  // 添加键盘事件监听器
+      switch (event.key) {  // 根据按键移动选中部分
+        case 'ArrowUp':
+          moveSelected('up');  // 上移
+          break;
+        case 'ArrowDown':
+          moveSelected('down');  // 下移
+          break;
+        case 'ArrowLeft':
+          moveSelected('left');  // 左移
+          break;
+        case 'ArrowRight':
+          moveSelected('right');  // 右移
+          break;
+        case ' ':  // 空格键实现跳跃
+          jump();
+          break;
+      }
+    });
+
+    function jump() {  // 跳跃函数
+      let jumpUp = true;
+      let jumpHeight = 0.2;
+      let jumpFrame = 0;
+
+      function performJump() {
+        if (jumpFrame < 20) {
+          const deltaY = jumpUp ? jumpHeight / 20 : -jumpHeight / 20;
+          for (const part in translations) {
+            translations[part].y += deltaY;  // 更新所有部分的Y坐标
+          }
+          drawScene();
+          jumpFrame++;
+          if (jumpFrame === 10) jumpUp = false;
+
+          requestAnimationFrame(performJump);
+        } else {
+          for (const part in translations) {
+            translations[part].y = 0;  // 重置所有部分的Y坐标
+          }
+          drawScene();
+        }
+      }
+      performJump();
+    }
+  </script>
+</body>
+</html>
